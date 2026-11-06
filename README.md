@@ -60,6 +60,24 @@ python3 -m unittest discover -s backend/tests -v
 
 Expected: 8 tests, all passing.
 
+## Run the dashboard
+
+```bash
+python3 -m backend.app
+```
+
+Then open http://localhost:8000
+
+One page, no build step, no extra dependencies. Score a transaction
+with the form, or click a demo case — clean (0, RELEASE),
+TRANSACTION_REFUSED alone (40, RELEASE), INSTRUMENT_DECLINED
+(50, HOLD), new payee + spike + velocity (60, HOLD), everything
+at once (capped at 100, HOLD). History shows every transaction
+scored this session, newest first. History resets on restart.
+
+The dashboard is real, not a mockup: it calls `POST /api/score`,
+which runs the same `classify()` the tests cover.
+
 ## Try the classifier
 
 ```bash

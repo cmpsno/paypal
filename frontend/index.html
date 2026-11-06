@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transaction-risk agent — PayPal AI Hackathon</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Transaction-risk agent</h1>
+      <p class="sub">Scores one PayPal Sandbox transaction at a time. HOLD or RELEASE, with the reasons shown. The score decides — nothing else does.</p>
+    </header>
+
+    <section class="card" id="score-card">
+      <h2>Score a transaction</h2>
+      <form id="score-form">
+        <label>Amount (USD)
+          <input id="amount" type="number" min="0" step="0.01" value="50" required>
+        </label>
+        <label>Payee ID <span class="hint">(leave blank = unknown payee)</span>
+          <input id="payee-id" type="text" placeholder="payee-new" value="payee-known">
+        </label>
+        <label>Sandbox status
+          <select id="sandbox-status">
+            <option value="SUCCESS">SUCCESS</option>
+            <option value="INSTRUMENT_DECLINED">INSTRUMENT_DECLINED</option>
+            <option value="TRANSACTION_REFUSED">TRANSACTION_REFUSED</option>
+            <option value="OTHER_FAILURE">Other failure</option>
+          </select>
+        </label>
+        <button type="submit">Score it</button>
+      </form>
+      <p class="hint">First-payee is not a checkbox — the server works it out from the transactions already scored this session. The first time a payee ever appears, it counts as first.</p>
+
+      <h3>Or run a demo case</h3>
+      <div class="demos" id="demos">
+        <button data-case="clean">Clean — $50, known payee</button>
+        <button data-case="refused">TRANSACTION_REFUSED alone — 40, RELEASE</button>
+        <button data-case="declined">INSTRUMENT_DECLINED — 50, HOLD</button>
+        <button data-case="pattern">New payee + spike + velocity — 60, HOLD</button>
+        <button data-case="capped">Everything at once — capped at 100, HOLD</button>
+      </div>
+    </section>
+
+    <section class="card" id="result-card" hidden>
+      <h2>Decision</h2>
+      <div class="decision-row">
+        <span id="decision" class="badge">—</span>
+        <span class="score"><span id="score">—</span><small> / 100</small></span>
+      </div>
+      <p id="why" class="why"></p>
+      <p><strong>Reason codes:</strong> <span id="codes"></span></p>
+      <p class="meta" id="result-meta"></p>
+    </section>
+
+    <section class="card">
+      <h2>History <span class="hint">— scored this session, newest first</span></h2>
+      <p id="empty" class="hint">Nothing scored yet. Score a transaction above.</p>
+      <table id="history-table" hidden>
+        <thead>
+          <tr><th>Amount</th><th>Payee</th><th>Sandbox</th><th>Score</th><th>Decision</th><th>Reasons</th></tr>
+        </thead>
+        <tbody id="history-body"></tbody>
+      </table>
+    </section>
+
+    <footer>
+      <p>How it works: score starts at 0, caps at 100. Under 50 RELEASE, 50+ HOLD.
+      INSTRUMENT_DECLINED +50, TRANSACTION_REFUSED +40, other failure +30,
+      amount &gt;3× median +25, 3+ in 60 min +20, first payee +15, amount &gt;$500 +10.
+      History resets when the server restarts.</p>
+    </footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
