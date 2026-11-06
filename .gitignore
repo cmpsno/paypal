@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets -- never commit PayPal credentials
+.env
+.env.*
+
+# Offline dataset -- download locally, do not commit (21 MB, CC BY 4.0)
+data/raw/
+*.csv
+
+# OS / editor
+.DS_Store
+.vscode/
