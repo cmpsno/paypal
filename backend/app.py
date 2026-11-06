@@ -47,6 +47,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from backend.history import TransactionHistory
+from backend.ml import inference as offline_ml
 from backend.models import NormalizedTransaction
 from backend.risk.classifier import classify
 from backend.risk.explainer import explain
@@ -150,6 +151,47 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True})
         elif parsed.path == "/api/transactions":
             self._send_json(200, SCORED)
+        elif parsed.path == "/api/offline-model":
+            # The evaluated offline model: what it is, what it scored,
+            # and the limits. Numbers come from the Step 1 evaluation
+            # (~/workspace/paypal-ml-baseline/evaluation.md) — they are
+            # reported here, not computed live.
+            self._send_json(200, {
+                "model": "logistic_regression",
+                "trained_on": "Zenodo dataset (Fatah & Rashid, CC BY 4.0), "
+                              "57,394 rows, 111 fraud (0.193%)",
+                "features": ["log1p(amount)"] + [f"v{i}" for i in range(1, 29)],
+                "threshold": offline_ml.load_model()["threshold"],
+                "note": "OFFLINE ONLY. This model was trained on the Zenodo "
+                        "dataset and never scores a live PayPal transaction — "
+                        "a live transaction has no v1-v28 features. The live "
+                        "rules engine above is the live decision-maker.",
+                "evaluation": {
+                    "method": "stratified 5-fold CV, out-of-fold; threshold "
+                              "tuned on the PR curve (max F1), frozen for the "
+                              "held-out test",
+                    "amount_only": {"pr_auc": 0.2134, "f1": 0.354,
+                                    "precision": 0.2632, "recall": 0.5405},
+                    "amount_plus_v": {"pr_auc": 0.7415, "f1": 0.824,
+                                      "precision": 0.7869, "recall": 0.8649},
+                    "held_out_test_amount_plus_v": {"pr_auc": 0.7849,
+                                                    "precision": 0.84,
+                                                    "recall": 0.9545},
+                    "baselines": {
+                        "predict_all_legitimate": {"accuracy": 0.9981, "recall": 0.0},
+                        "amount_rules": {"recall": 1.0, "precision": 0.007,
+                                         "flagged_share": 0.275},
+                    },
+                },
+                "limits": [
+                    "Only 111 fraud rows — recall is roughly 0.79-0.92, not a point.",
+                    "Labels come from the original system's decisions; missed fraud is plausibly recorded as not-fraud.",
+                    "This is not PayPal data and not real customer banking data.",
+                    "The 0.99 threshold is a calibration artifact of balanced class weights — at that threshold 79% of flagged rows are fraud, not 99%.",
+                ],
+            })
+        elif parsed.path == "/api/offline-samples":
+            self._send_json(200, offline_ml.load_samples())
         else:
             self.send_response(404)
             self.end_headers()
@@ -161,13 +203,25 @@ class Handler(BaseHTTPRequestHandler):
             SCORED.clear()
             self._send_json(200, {"ok": True})
             return
-        if parsed.path != "/api/score":
+        if parsed.path != "/api/score" and parsed.path != "/api/offline-score":
             self.send_response(404)
             self.end_headers()
             return
         try:
             length = int(self.headers.get("Content-Length") or 0)
             payload = json.loads(self.rfile.read(length) or b"{}")
+            if parsed.path == "/api/offline-score":
+                # Offline only: scores a Zenodo-style row (amount + v1-v28)
+                # with the exported model. Never a PayPal transaction.
+                try:
+                    amount = float(payload.get("amount", 0))
+                except (TypeError, ValueError):
+                    raise ValueError("amount must be a number")
+                v = payload.get("features") or {}
+                record = offline_ml.score(amount, v)
+                record["amount"] = amount
+                self._send_json(200, record)
+                return
             record = score_transaction(payload)
         except ValueError as exc:
             self._send_json(400, {"error": str(exc)})

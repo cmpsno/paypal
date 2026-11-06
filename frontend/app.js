@@ -130,3 +130,58 @@ document.getElementById("demos").addEventListener("click", async (e) => {
 });
 
 refreshHistory();
+
+// --- Offline ML panel (Zenodo data only; never a PayPal transaction) ---
+async function loadOfflineModel() {
+  const el = document.getElementById("offline-metrics");
+  try {
+    const res = await api("/api/offline-model");
+    const m = await res.json();
+    const a = m.evaluation.amount_plus_v;
+    el.textContent =
+      `Logistic regression, ${m.trained_on}. Out-of-fold PR-AUC ${a.pr_auc} ` +
+      `(amount-only: ${m.evaluation.amount_only.pr_auc}), F1 ${a.f1}, ` +
+      `precision ${a.precision}, recall ${a.recall}, threshold ${m.threshold}. ` +
+      `Amount rules catch all fraud but flag 27.5% of traffic; this model ` +
+      `catches 96 of 111 while flagging 0.21%.`;
+  } catch {
+    el.textContent = "Offline model unavailable.";
+  }
+}
+
+async function loadOfflineSamples() {
+  const wrap = document.getElementById("offline-samples");
+  try {
+    const res = await api("/api/offline-samples");
+    const data = await res.json();
+    data.samples.forEach((s) => {
+      const btn = document.createElement("button");
+      btn.textContent = `${s.label} — $${s.amount} (dataset label: ${s.is_fraud ? "fraud" : "legitimate"})`;
+      btn.addEventListener("click", async () => {
+        const r = await api("/api/offline-score", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: s.amount, features: s.features }),
+        });
+        if (!r.ok) return;
+        const out = await r.json();
+        document.getElementById("offline-result").hidden = false;
+        document.getElementById("offline-label").textContent =
+          `${s.label} — $${s.amount}, dataset label: ${s.is_fraud ? "fraud" : "legitimate"} (as recorded)`;
+        document.getElementById("offline-prob").textContent = out.probability;
+        document.getElementById("offline-threshold").textContent = out.threshold;
+        const badge = document.getElementById("offline-decision");
+        badge.textContent = out.decision;
+        badge.className = "badge " + (out.decision === "FLAG" ? "hold" : "release");
+        document.getElementById("offline-signals").textContent =
+          out.top_signals.map((t) => t.feature).join(", ");
+      });
+      wrap.appendChild(btn);
+    });
+  } catch {
+    wrap.textContent = "Offline samples unavailable.";
+  }
+}
+
+loadOfflineModel();
+loadOfflineSamples();

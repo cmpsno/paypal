@@ -68,6 +68,31 @@
       </table>
     </section>
 
+    <section class="card" id="offline-card">
+      <h2>Offline ML model <span class="hint">— Zenodo data only, never PayPal</span></h2>
+      <p class="hint">A logistic regression trained offline on the Zenodo dataset
+      (57,394 rows, 111 fraud). It scores <em>dataset rows</em> — amount plus
+      28 PCA signals (v1–v28). It never scores a live PayPal transaction:
+      a live transaction has no v1–v28 features. The rules engine above
+      is the live decision-maker; this is the evaluated offline baseline.</p>
+      <p id="offline-metrics" class="meta">Loading offline model…</p>
+      <h3>Score a real dataset row</h3>
+      <div class="demos" id="offline-samples"></div>
+      <div id="offline-result" hidden>
+        <p><strong>Dataset row:</strong> <span id="offline-label"></span></p>
+        <p><strong>ML probability of fraud:</strong> <span id="offline-prob"></span>
+          (threshold <span id="offline-threshold"></span>) —
+          <span id="offline-decision" class="badge"></span></p>
+        <p><strong>Strongest statistical signals:</strong>
+          <span id="offline-signals"></span> — PCA components, not behaviours.
+          Nobody knows what one of them means on its own.</p>
+      </div>
+      <p class="hint">Limits: only 111 fraud rows, so recall is roughly 0.79–0.92,
+      not a point. Labels come from the original system's decisions. This is
+      not PayPal data and not real customer banking data. The 0.99 threshold
+      is a calibration artifact of balanced class weights.</p>
+    </section>
+
     <footer>
       <p>How it works: score starts at 0, caps at 100. Under 50 RELEASE, 50+ HOLD.
       INSTRUMENT_DECLINED +50, TRANSACTION_REFUSED +40, other failure +30,

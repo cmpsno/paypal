@@ -33,6 +33,15 @@ its own before the next was added.
   never makes the decision and never changes the score; an LLM
   may only reword the template sentence, with fallback to the
   template if it fails. 11 tests.
+- `backend/ml/` — the offline ML model (Step 1): `model.json` holds
+  exported logistic-regression weights (trained offline with
+  scikit-learn, never on Render); `inference.py` scores Zenodo-style
+  rows with a stdlib dot product + sigmoid; `samples.json` holds
+  three real dataset rows. Served by the dashboard's offline panel
+  (`GET /api/offline-model`, `/api/offline-samples`,
+  `POST /api/offline-score`). It never scores a live PayPal
+  transaction — a live transaction has no v1–v28 features.
+  8 tests. Full evaluation: `docs/ml-offline.md`.
 
 ## The decision, in one paragraph
 
@@ -71,8 +80,8 @@ No dependencies to install — Python 3.12 standard library only.
 python3 -m unittest discover -s backend/tests -v
 ```
 
-Expected: 42 tests, all passing (12 classifier, 19 Sandbox/history,
-11 explainer).
+Expected: 50 tests, all passing (12 classifier, 19 Sandbox/history,
+11 explainer, 8 offline ML).
 
 ## Run the dashboard
 
