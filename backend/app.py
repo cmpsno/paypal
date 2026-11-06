@@ -49,6 +49,7 @@ from urllib.parse import urlparse
 from backend.history import TransactionHistory
 from backend.models import NormalizedTransaction
 from backend.risk.classifier import classify
+from backend.risk.explainer import explain
 
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend"
@@ -89,6 +90,9 @@ def score_transaction(payload: dict) -> dict:
         "decision": result.decision,
         "reason_codes": result.reason_codes,
         "top_reason": result.top_reason,
+        # Plain-English sentence from the explainer. The score and
+        # decision above are already final -- this only explains them.
+        "explanation": explain(result, tx),
         "timestamp": tx.timestamp.isoformat() if tx.timestamp else None,
     }
     SCORED.insert(0, record)

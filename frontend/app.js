@@ -52,6 +52,11 @@ function showResult(r) {
     r.decision === "HOLD"
       ? `Held at ${r.score}/100 — top reason: ${r.top_reason || "—"}.`
       : `Released at ${r.score}/100 — ${r.reason_codes.length ? "some risk signals, but below the 50-point bar." : "no risk signals."}`;
+  // Plain-English explanation from the server. The score decides;
+  // this only explains it. Falls back to the one-liner above if an
+  // older server response has no explanation field.
+  document.getElementById("explanation").textContent =
+    r.explanation || "";
   document.getElementById("result-meta").textContent =
     `$${r.amount} · payee ${r.payee_id || "(unknown)"} · ${r.sandbox_status}` +
     (r.account_median_amount != null ? ` · account median $${r.account_median_amount}` : "") +

@@ -10,10 +10,8 @@ One thing, done well. Not a banking app.
 
 ## What is built so far
 
-Only the classifier. Nothing else yet — no PayPal integration,
-no dashboard, no AI explainer. That is on purpose: the classifier
-is the most important part, and it works and is tested on its own
-before any external dependency is introduced.
+The classifier first, then the pieces around it — each tested on
+its own before the next was added.
 
 - `backend/models.py` — `NormalizedTransaction`, the one shape
   everything agrees on. `payee_id` is `Optional[str]`; if it is
@@ -23,6 +21,17 @@ before any external dependency is introduced.
 - `backend/risk/classifier.py` — `classify(transaction)`, a pure
   function: same input, same output, no network, no randomness.
 - `backend/tests/test_classifier.py` — 8 unit tests.
+- `backend/paypal_client.py` + `backend/history.py` — PayPal
+  Sandbox adapter and demo-session history (median, velocity,
+  first payee), with a CLI demo. 17 more tests.
+- `backend/app.py` + `frontend/` — dashboard: score form, 5 demo
+  cases, history table. Served by the same server locally and on
+  Render; the Pages copy calls the Render API.
+- `backend/risk/explainer.py` — the AI explanation layer: turns a
+  finished classification into one plain-English sentence. It
+  never makes the decision and never changes the score; an LLM
+  may only reword the template sentence, with fallback to the
+  template if it fails. 10 tests.
 
 ## The decision, in one paragraph
 
@@ -46,9 +55,11 @@ Full spec: `docs/scoring-spec.md`.
 
 - **The scoring engine makes the financial risk decision.**
   That is `classify()`, and only that.
-- **The AI explains that decision.** A separate explainer module
-  (not built yet) will turn reason codes into a plain-English
-  sentence. It never makes the decision and never changes the score.
+- **The AI explains that decision.** `backend/risk/explainer.py`
+  turns reason codes into a plain-English sentence. It never
+  makes the decision and never changes the score. An LLM plugged
+  in later may only reword that sentence; if it fails, the
+  template sentence is used instead.
 
 ## Run the tests
 
@@ -58,7 +69,8 @@ No dependencies to install — Python 3.12 standard library only.
 python3 -m unittest discover -s backend/tests -v
 ```
 
-Expected: 8 tests, all passing.
+Expected: 35 tests, all passing (8 classifier, 17 Sandbox/history,
+10 explainer).
 
 ## Run the dashboard
 
@@ -102,10 +114,8 @@ Expected: score 60, HOLD, codes
 
 ## What comes next (in order)
 
-1. Connect the PayPal Sandbox.
-2. Build the dashboard around the classifier's output.
-3. Integrate the AI explanation layer.
-4. Offline evaluation against the public dataset — see `docs/dataset.md`.
+1. Offline evaluation against the public dataset — see `docs/dataset.md`.
+2. Demo video (under 3 minutes) + Devpost submission.
 
 ## Dataset attribution
 
