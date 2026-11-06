@@ -6,10 +6,16 @@ Then open http://localhost:8000
 
 What it does:
   GET  /                    -> the dashboard (frontend/index.html)
-  GET  /style.css, /app.js  -> dashboard assets
+  GET  /style.css, /app.js, /config.js -> dashboard assets
+  GET  /health              -> {"ok": true} (Render health check)
   GET  /api/transactions    -> every transaction scored so far, newest first
   POST /api/score           -> score one transaction, record it, return it
   POST /api/reset           -> clear demo-session history (for repeatable demos)
+
+CORS: the API sends Access-Control-Allow-Origin: * so the same
+dashboard can also be hosted on GitHub Pages (a different origin)
+and call this server on Render. No credentials or secrets are
+involved — the API only scores demo transactions.
 
 POST /api/score body (JSON):
   {
@@ -97,9 +103,21 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(data).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def do_OPTIONS(self):  # noqa: N802 - http.server naming
+        # CORS preflight, for the GitHub Pages dashboard calling Render.
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _send_file(self, path: Path, content_type: str) -> None:
         if not path.is_file():
@@ -121,6 +139,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_file(FRONTEND / "style.css", "text/css")
         elif parsed.path == "/app.js":
             self._send_file(FRONTEND / "app.js", "text/javascript")
+        elif parsed.path == "/config.js":
+            self._send_file(FRONTEND / "config.js", "text/javascript")
+        elif parsed.path == "/health":
+            self._send_json(200, {"ok": True})
         elif parsed.path == "/api/transactions":
             self._send_json(200, SCORED)
         else:

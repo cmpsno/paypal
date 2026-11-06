@@ -1,0 +1,55 @@
+name: Deploy frontend to GitHub Pages
+
+# Deploys frontend/ only. The Python API is NOT on Pages — it runs
+# on Render (see render.yaml + docs/deploy.md). This workflow
+# injects the Render URL into a copy of frontend/config.js at
+# deploy time, so the Pages site calls the Render API.
+# The file in the repo is never changed by this workflow.
+
+on:
+  push:
+    branches: [main]
+    paths: ["frontend/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Point the frontend at Render
+        # Repo variable RENDER_API_URL, e.g.
+        # https://paypal-risk-api.onrender.com (no trailing slash).
+        # If the variable is not set yet, the site deploys with
+        # API_BASE = "" and scoring will fail on Pages until it is set
+        # and this workflow is re-run — see docs/deploy.md.
+        if: vars.RENDER_API_URL != ''
+        run: |
+          sed -i 's|window.API_BASE = "";|window.API_BASE = "${{ vars.RENDER_API_URL }}";|' frontend/config.js
+          grep API_BASE frontend/config.js
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload frontend
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

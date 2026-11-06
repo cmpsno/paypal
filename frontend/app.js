@@ -1,6 +1,14 @@
-// Dashboard logic: talk to /api/score and /api/transactions, nothing else.
+// Dashboard logic: talk to the scoring API, nothing else.
 // No framework, no build step. The server does the scoring;
 // this file only sends the form and renders what comes back.
+//
+// API_BASE comes from config.js: "" locally (same origin), or the
+// Render URL when this page is hosted on GitHub Pages.
+const API_BASE = (window.API_BASE || "").replace(/\/$/, "");
+
+async function api(path, options) {
+  return fetch(API_BASE + path, options);
+}
 
 const form = document.getElementById("score-form");
 const resultCard = document.getElementById("result-card");
@@ -19,7 +27,7 @@ const DEMO_CASES = {
 };
 
 async function score(payload) {
-  const res = await fetch("/api/score", {
+  const res = await api("/api/score", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -69,7 +77,7 @@ function renderHistory(rows) {
 }
 
 async function refreshHistory() {
-  const res = await fetch("/api/transactions");
+  const res = await api("/api/transactions");
   renderHistory(await res.json());
 }
 
@@ -87,7 +95,7 @@ document.getElementById("demos").addEventListener("click", async (e) => {
   const btn = e.target.closest("button[data-case]");
   if (!btn) return;
   // Reset first so every demo case is deterministic on every click.
-  await fetch("/api/reset", { method: "POST" });
+  await api("/api/reset", { method: "POST" });
   // Seed one clean $50 transaction to "payee-known" first, so that
   // payee is known (not first) for the clean / refused / declined cases.
   // The pattern / capped cases need account history to score 60 / 100:

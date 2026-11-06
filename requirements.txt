@@ -1,0 +1,2 @@
+# No dependencies — Python standard library only.
+# This file exists so Render's build step has something to run.
