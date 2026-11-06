@@ -103,6 +103,7 @@ function renderHistory(rows) {
 async function refreshHistory() {
   const res = await api("/api/transactions");
   renderHistory(await res.json());
+  loadMonitoring();
 }
 
 form.addEventListener("submit", async (e) => {
@@ -175,6 +176,7 @@ async function loadOfflineSamples() {
         badge.className = "badge " + (out.decision === "FLAG" ? "hold" : "release");
         document.getElementById("offline-signals").textContent =
           out.top_signals.map((t) => t.feature).join(", ");
+        loadMonitoring();
       });
       wrap.appendChild(btn);
     });
@@ -185,3 +187,65 @@ async function loadOfflineSamples() {
 
 loadOfflineModel();
 loadOfflineSamples();
+
+// --- Monitoring panel (the feedback loop) ---
+async function loadMonitoring() {
+  const metricsEl = document.getElementById("monitoring-metrics");
+  const body = document.getElementById("monitoring-body");
+  try {
+    const [mRes, pRes] = await Promise.all([
+      api("/api/monitoring"),
+      api("/api/predictions"),
+    ]);
+    const m = await mRes.json();
+    const rows = await pRes.json();
+    const c = m.confirmed_outcomes;
+    metricsEl.textContent =
+      `${m.total_predictions} prediction(s) logged · ` +
+      `hold/flag rate ${m.hold_or_flag_rate ?? "—"} · ` +
+      `median amount all-time $${m.drift.median_amount_all ?? "—"}, ` +
+      `last 20 $${m.drift.median_amount_last_20 ?? "—"} · ` +
+      (c
+        ? `confirmed: ${c.n} (${c.fraud} fraud, ${c.legitimate} legitimate) — ` +
+          `precision ${c.precision}, recall ${c.recall}, F1 ${c.f1}`
+        : m.confirmed_note);
+    document.getElementById("monitoring-empty").hidden = rows.length > 0;
+    document.getElementById("monitoring-table").hidden = rows.length === 0;
+    body.innerHTML = "";
+    for (const r of rows.slice(0, 10)) {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td>${r.transaction_id}</td>` +
+        `<td>${r.model}</td>` +
+        `<td>${r.decision}</td>` +
+        `<td>${r.score ?? r.probability ?? "—"}</td>` +
+        `<td>${r.outcome || "(awaiting outcome)"}</td>`;
+      body.appendChild(tr);
+    }
+  } catch {
+    metricsEl.textContent = "Monitoring unavailable.";
+  }
+}
+
+document.getElementById("outcome-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById("outcome-msg");
+  const res = await api("/api/outcomes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      transaction_id: document.getElementById("outcome-tx").value.trim(),
+      outcome: document.getElementById("outcome-value").value,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    msg.textContent = err.error || "Could not record outcome.";
+    return;
+  }
+  const entry = await res.json();
+  msg.textContent = `Recorded: ${entry.transaction_id} confirmed ${entry.outcome}.`;
+  loadMonitoring();
+});
+
+loadMonitoring();

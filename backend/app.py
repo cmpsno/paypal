@@ -11,6 +11,12 @@ What it does:
   GET  /api/transactions    -> every transaction scored so far, newest first
   POST /api/score           -> score one transaction, record it, return it
   POST /api/reset           -> clear demo-session history (for repeatable demos)
+  GET  /api/predictions     -> logged predictions, newest first (the feedback loop)
+  POST /api/outcomes        -> record a confirmed outcome (fraud/legitimate)
+  GET  /api/monitoring      -> volumes, hold rate, confirmed metrics, drift signals
+  GET  /api/offline-model   -> offline ML model card (metrics, limits)
+  GET  /api/offline-samples -> three real Zenodo rows
+  POST /api/offline-score   -> score one Zenodo-style row (amount + v1-v28)
 
 CORS: the API sends Access-Control-Allow-Origin: * so the same
 dashboard can also be hosted on GitHub Pages (a different origin)
@@ -49,6 +55,8 @@ from urllib.parse import urlparse
 from backend.history import TransactionHistory
 from backend.ml import inference as offline_ml
 from backend.models import NormalizedTransaction
+from backend import monitoring
+from backend.risk import config
 from backend.risk.classifier import classify
 from backend.risk.explainer import explain
 
@@ -98,6 +106,18 @@ def score_transaction(payload: dict) -> dict:
         "timestamp": tx.timestamp.isoformat() if tx.timestamp else None,
     }
     SCORED.insert(0, record)
+    # Feedback loop: log the prediction (score, decision, reasons,
+    # model version, timestamp). Logging never changes the score —
+    # it is the record the loop measures against later, when a
+    # confirmed outcome arrives.
+    monitoring.LOG.log(
+        model=config.MODEL_VERSION,
+        transaction_id=tx.transaction_id,
+        decision=result.decision,
+        amount=tx.amount,
+        score=result.score,
+        reason_codes=result.reason_codes,
+    )
     return record
 
 
@@ -192,6 +212,10 @@ class Handler(BaseHTTPRequestHandler):
             })
         elif parsed.path == "/api/offline-samples":
             self._send_json(200, offline_ml.load_samples())
+        elif parsed.path == "/api/predictions":
+            self._send_json(200, monitoring.LOG.recent(50))
+        elif parsed.path == "/api/monitoring":
+            self._send_json(200, monitoring.LOG.summary())
         else:
             self.send_response(404)
             self.end_headers()
@@ -201,7 +225,24 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/reset":
             HISTORY._txns.clear()
             SCORED.clear()
+            monitoring.LOG.clear()
             self._send_json(200, {"ok": True})
+            return
+        if parsed.path == "/api/outcomes":
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                payload = json.loads(self.rfile.read(length) or b"{}")
+                entry = monitoring.LOG.record_outcome(
+                    str(payload.get("transaction_id") or ""),
+                    str(payload.get("outcome") or ""),
+                )
+            except ValueError as exc:
+                self._send_json(400, {"error": str(exc)})
+                return
+            except (json.JSONDecodeError, TypeError):
+                self._send_json(400, {"error": "body must be valid JSON"})
+                return
+            self._send_json(200, entry)
             return
         if parsed.path != "/api/score" and parsed.path != "/api/offline-score":
             self.send_response(404)
@@ -220,6 +261,16 @@ class Handler(BaseHTTPRequestHandler):
                 v = payload.get("features") or {}
                 record = offline_ml.score(amount, v)
                 record["amount"] = amount
+                # Log it too — the loop covers both models, each under
+                # its own version, so their records never mix.
+                monitoring.LOG.log(
+                    model=monitoring.OFFLINE_MODEL_VERSION,
+                    transaction_id=payload.get("transaction_id") or uuid.uuid4().hex[:8],
+                    decision=record["decision"],
+                    amount=amount,
+                    probability=record["probability"],
+                    reason_codes=[s["feature"] for s in record["top_signals"]],
+                )
                 self._send_json(200, record)
                 return
             record = score_transaction(payload)

@@ -42,6 +42,13 @@ its own before the next was added.
   `POST /api/offline-score`). It never scores a live PayPal
   transaction — a live transaction has no v1–v28 features.
   8 tests. Full evaluation: `docs/ml-offline.md`.
+- `backend/monitoring.py` — the feedback loop: logs every prediction
+  (model version, score, decision, reasons, timestamp), records
+  confirmed outcomes when they arrive, and reports volumes, hold
+  rate, confirmed precision/recall, and drift signals
+  (`GET /api/predictions`, `POST /api/outcomes`,
+  `GET /api/monitoring`). Logging never changes a score. Storage is
+  in-memory and resets on restart. 11 tests. Design: `docs/monitoring.md`.
 
 ## The decision, in one paragraph
 
@@ -80,8 +87,8 @@ No dependencies to install — Python 3.12 standard library only.
 python3 -m unittest discover -s backend/tests -v
 ```
 
-Expected: 50 tests, all passing (12 classifier, 19 Sandbox/history,
-11 explainer, 8 offline ML).
+Expected: 61 tests, all passing (12 classifier, 19 Sandbox/history,
+11 explainer, 8 offline ML, 11 monitoring).
 
 ## Run the dashboard
 

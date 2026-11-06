@@ -93,6 +93,40 @@
       is a calibration artifact of balanced class weights.</p>
     </section>
 
+    <section class="card" id="monitoring-card">
+      <h2>Monitoring <span class="hint">— the feedback loop</span></h2>
+      <p class="hint">Every prediction is logged with its model version, score,
+      decision, and reasons — logging never changes a score. True
+      precision/recall can't be measured until someone confirms what was
+      actually fraud, which arrives days or weeks later. Drift is the early
+      warning: recent predictions compared against all-time, watchable
+      before any outcomes arrive. Storage is in-memory and resets when the
+      server restarts.</p>
+      <p id="monitoring-metrics" class="meta">Loading monitoring…</p>
+      <h3>Record a confirmed outcome</h3>
+      <form id="outcome-form">
+        <label>Transaction ID
+          <input id="outcome-tx" type="text" placeholder="e.g. 3317294a" required>
+        </label>
+        <label>Confirmed outcome
+          <select id="outcome-value">
+            <option value="fraud">Fraud</option>
+            <option value="legitimate">Legitimate</option>
+          </select>
+        </label>
+        <button type="submit">Record outcome</button>
+      </form>
+      <p id="outcome-msg" class="hint"></p>
+      <h3>Recent predictions</h3>
+      <p id="monitoring-empty" class="hint">Nothing logged yet. Score a transaction above.</p>
+      <table id="monitoring-table" hidden>
+        <thead>
+          <tr><th>Transaction</th><th>Model</th><th>Decision</th><th>Score / Prob</th><th>Outcome</th></tr>
+        </thead>
+        <tbody id="monitoring-body"></tbody>
+      </table>
+    </section>
+
     <footer>
       <p>How it works: score starts at 0, caps at 100. Under 50 RELEASE, 50+ HOLD.
       INSTRUMENT_DECLINED +50, TRANSACTION_REFUSED +40, other failure +30,

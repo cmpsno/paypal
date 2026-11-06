@@ -10,6 +10,11 @@ They are not a trained fraud model.
 # Decision threshold: score >= this means HOLD, below means RELEASE.
 HOLD_THRESHOLD = 50
 
+# Model version, recorded on every prediction in the monitoring log.
+# Bump this when weights, thresholds, or rules change, so a logged
+# prediction can always be traced to the rules that made it.
+MODEL_VERSION = "rules-1.0"
+
 # Scores never go above this, no matter how many signals fire.
 MAX_SCORE = 100
 
