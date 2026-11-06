@@ -47,6 +47,30 @@ class TestHistory(unittest.TestCase):
         self.assertFalse(h.is_first_payee("payee-a"))
         self.assertTrue(h.is_first_payee("payee-b"))
 
+    def test_structuring_counts_only_small_same_payee_recent(self):
+        now = datetime.now(timezone.utc)
+        h = TransactionHistory()
+        # 4 small $20 to payee-a in the last 10 min -> counts.
+        for minutes_ago in (1, 3, 5, 9):
+            h.record(_tx(20.0, payee="payee-a", when=now - timedelta(minutes=minutes_ago)))
+        # A $100 to payee-a: too big to count as small.
+        h.record(_tx(100.0, payee="payee-a", when=now - timedelta(minutes=2)))
+        # A $20 to a different payee: wrong payee.
+        h.record(_tx(20.0, payee="payee-b", when=now - timedelta(minutes=2)))
+        # A $20 to payee-a 11 minutes ago: outside the window.
+        h.record(_tx(20.0, payee="payee-a", when=now - timedelta(minutes=11)))
+        self.assertEqual(h.same_payee_small_txns_last_10m("payee-a", now), 4)
+        self.assertEqual(h.same_payee_small_txns_last_10m("payee-b", now), 1)
+        self.assertEqual(h.same_payee_small_txns_last_10m(None, now), 0)
+
+    def test_enrich_fills_structuring_count(self):
+        now = datetime.now(timezone.utc)
+        h = TransactionHistory()
+        for minutes_ago in (1, 4, 7, 9):
+            h.record(_tx(20.0, payee="payee-a", when=now - timedelta(minutes=minutes_ago)))
+        enriched = h.enrich(_tx(20.0, payee="payee-a", when=now), now)
+        self.assertEqual(enriched.same_payee_small_txns_last_10m, 4)
+
     def test_unknown_payee_is_never_first(self):
         h = TransactionHistory()
         self.assertFalse(h.is_first_payee(None))

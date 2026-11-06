@@ -40,6 +40,7 @@
         <button data-case="refused">TRANSACTION_REFUSED alone — 40, RELEASE</button>
         <button data-case="declined">INSTRUMENT_DECLINED — 50, HOLD</button>
         <button data-case="pattern">New payee + spike + velocity — 60, HOLD</button>
+        <button data-case="structuring">Structuring — 5 × $20 in 10 min, same payee — 50, HOLD</button>
         <button data-case="capped">Everything at once — capped at 100, HOLD</button>
       </div>
     </section>
@@ -71,6 +72,7 @@
       <p>How it works: score starts at 0, caps at 100. Under 50 RELEASE, 50+ HOLD.
       INSTRUMENT_DECLINED +50, TRANSACTION_REFUSED +40, other failure +30,
       amount &gt;3× median +25, 3+ in 60 min +20, first payee +15, amount &gt;$500 +10.
+      Structuring: 5th small (≤$50) transaction to the same payee within 10 min +30.
       History resets when the server restarts.</p>
     </footer>
   </main>

@@ -21,6 +21,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from backend.models import NormalizedTransaction
+from backend.risk import config
 
 
 class TransactionHistory:
@@ -56,6 +57,30 @@ class TransactionHistory:
             if tx.timestamp is not None and tx.timestamp >= cutoff
         )
 
+    def same_payee_small_txns_last_10m(
+        self, payee_id: str | None, now: datetime | None = None
+    ) -> int:
+        """Prior *small* transactions to this payee in the window.
+
+        Counts prior transactions to ``payee_id`` within the last
+        ``config.STRUCTURING_WINDOW_MINUTES`` minutes, each at most
+        ``config.STRUCTURING_MAX_AMOUNT``. Unknown payee (None)
+        counts as 0 -- structuring needs a known payee, same guard
+        as NEW_PAYEE. Transactions without a timestamp are ignored.
+        """
+        if payee_id is None:
+            return 0
+        now = now or datetime.now(timezone.utc)
+        cutoff = now - timedelta(minutes=config.STRUCTURING_WINDOW_MINUTES)
+        return sum(
+            1
+            for tx in self._txns
+            if tx.payee_id == payee_id
+            and tx.timestamp is not None
+            and tx.timestamp >= cutoff
+            and tx.amount <= config.STRUCTURING_MAX_AMOUNT
+        )
+
     def is_first_payee(self, payee_id: str | None) -> bool:
         """True if no prior transaction went to this payee.
 
@@ -80,5 +105,8 @@ class TransactionHistory:
             tx,
             account_median_amount=self.median_amount(),
             txns_last_60m=self.txns_last_60m(now),
+            same_payee_small_txns_last_10m=self.same_payee_small_txns_last_10m(
+                tx.payee_id, now
+            ),
             is_first_payee=self.is_first_payee(tx.payee_id),
         )

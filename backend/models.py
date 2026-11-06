@@ -54,6 +54,12 @@ class NormalizedTransaction:
     # How many transactions this account made in the last 60 minutes.
     txns_last_60m: int = 0
 
+    # How many *small* transactions went to this same payee in the
+    # last 10 minutes (prior transactions only, each at most
+    # config.STRUCTURING_MAX_AMOUNT). Drives the STRUCTURING rule.
+    # 0 when unknown / no payee / no history -- scores 0, not a guess.
+    same_payee_small_txns_last_10m: int = 0
+
     # True only if this is the first transaction to this payee.
     # Only counts when payee_id is set (see above).
     is_first_payee: bool = False

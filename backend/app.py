@@ -85,6 +85,7 @@ def score_transaction(payload: dict) -> dict:
         "sandbox_status": tx.sandbox_status,
         "account_median_amount": tx.account_median_amount,
         "txns_last_60m": tx.txns_last_60m,
+        "same_payee_small_txns_last_10m": tx.same_payee_small_txns_last_10m,
         "is_first_payee": tx.is_first_payee,
         "score": result.score,
         "decision": result.decision,

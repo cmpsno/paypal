@@ -20,18 +20,19 @@ its own before the next was added.
   HOLD threshold, in one place.
 - `backend/risk/classifier.py` — `classify(transaction)`, a pure
   function: same input, same output, no network, no randomness.
-- `backend/tests/test_classifier.py` — 8 unit tests.
+- `backend/tests/test_classifier.py` — 12 unit tests, including
+  the structuring rule (5th small txn to the same payee in 10 min).
 - `backend/paypal_client.py` + `backend/history.py` — PayPal
   Sandbox adapter and demo-session history (median, velocity,
   first payee), with a CLI demo. 17 more tests.
-- `backend/app.py` + `frontend/` — dashboard: score form, 5 demo
+- `backend/app.py` + `frontend/` — dashboard: score form, 6 demo
   cases, history table. Served by the same server locally and on
   Render; the Pages copy calls the Render API.
 - `backend/risk/explainer.py` — the AI explanation layer: turns a
   finished classification into one plain-English sentence. It
   never makes the decision and never changes the score; an LLM
   may only reword the template sentence, with fallback to the
-  template if it fails. 10 tests.
+  template if it fails. 11 tests.
 
 ## The decision, in one paragraph
 
@@ -46,6 +47,7 @@ Reason codes are always returned, so the decision can be explained.
 | Other Sandbox failure | +30 |
 | Amount > 3x account median | +25 |
 | 3+ transactions in 60 minutes | +20 |
+| 5th+ small (≤$50) txn to same payee in 10 min | +30 |
 | First-time payee | +15 |
 | Amount > $500 | +10 |
 
@@ -69,8 +71,8 @@ No dependencies to install — Python 3.12 standard library only.
 python3 -m unittest discover -s backend/tests -v
 ```
 
-Expected: 35 tests, all passing (8 classifier, 17 Sandbox/history,
-10 explainer).
+Expected: 42 tests, all passing (12 classifier, 19 Sandbox/history,
+11 explainer).
 
 ## Run the dashboard
 
@@ -83,7 +85,8 @@ Then open http://localhost:8000
 One page, no build step, no extra dependencies. Score a transaction
 with the form, or click a demo case — clean (0, RELEASE),
 TRANSACTION_REFUSED alone (40, RELEASE), INSTRUMENT_DECLINED
-(50, HOLD), new payee + spike + velocity (60, HOLD), everything
+(50, HOLD), new payee + spike + velocity (60, HOLD), structuring:
+5 × $20 in 10 min to the same payee (50, HOLD), everything
 at once (capped at 100, HOLD). History shows every transaction
 scored this session, newest first. History resets on restart.
 

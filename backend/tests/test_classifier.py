@@ -97,6 +97,71 @@ class TestClassifier(unittest.TestCase):
         second = classify(tx(amount=400.0, txns_last_60m=3, is_first_payee=True))
         self.assertEqual(first, second)
 
+    def test_structuring_fifth_small_txn_holds_at_50(self):
+        # The Q1 gap: five $20 payments to the same payee in 10 min.
+        # Each is under every amount threshold, so without this rule
+        # the score would be 20 (velocity only) and RELEASE.
+        # With it: 20 (velocity, 4 prior in 60 min) + 30 = 50 HOLD.
+        result = classify(
+            tx(
+                amount=20.0,
+                account_median_amount=50.0,
+                txns_last_60m=4,
+                same_payee_small_txns_last_10m=4,
+            )
+        )
+        self.assertEqual(result.score, 50)
+        self.assertEqual(result.decision, "HOLD")
+        self.assertEqual(
+            result.reason_codes, ["VELOCITY_BURST", "STRUCTURING"]
+        )
+
+    def test_structuring_needs_four_prior_small(self):
+        # The 4th $20 (only 3 prior small same-payee) is not a
+        # pattern yet: velocity only, 20, RELEASE.
+        result = classify(
+            tx(
+                amount=20.0,
+                account_median_amount=50.0,
+                txns_last_60m=3,
+                same_payee_small_txns_last_10m=3,
+            )
+        )
+        self.assertEqual(result.score, 20)
+        self.assertEqual(result.decision, "RELEASE")
+        self.assertNotIn("STRUCTURING", result.reason_codes)
+
+    def test_structuring_does_not_fire_on_large_amounts(self):
+        # 5 x $100 to the same payee: velocity fires, but the
+        # transactions are not small, so STRUCTURING does not.
+        result = classify(
+            tx(
+                amount=100.0,
+                account_median_amount=50.0,
+                txns_last_60m=4,
+                same_payee_small_txns_last_10m=4,
+            )
+        )
+        self.assertEqual(result.score, 20)
+        self.assertEqual(result.decision, "RELEASE")
+        self.assertNotIn("STRUCTURING", result.reason_codes)
+
+    def test_structuring_needs_known_payee(self):
+        # Unknown payee (None) never fires STRUCTURING, same guard
+        # as NEW_PAYEE -- even with 4 prior small transactions.
+        result = classify(
+            tx(
+                amount=20.0,
+                payee_id=None,
+                account_median_amount=50.0,
+                txns_last_60m=4,
+                same_payee_small_txns_last_10m=4,
+            )
+        )
+        self.assertEqual(result.score, 20)
+        self.assertEqual(result.decision, "RELEASE")
+        self.assertNotIn("STRUCTURING", result.reason_codes)
+
     def test_unknown_payee_gets_no_first_payee_points(self):
         # payee_id is Optional. If it is None, NEW_PAYEE (+15)
         # must NOT fire, even if is_first_payee was passed as True.

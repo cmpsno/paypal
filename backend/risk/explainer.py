@@ -48,6 +48,7 @@ PHRASES = {
     "VELOCITY_BURST": "3 or more transactions arrived within 60 minutes",
     "NEW_PAYEE": "this is a first-time payee",
     "HIGH_AMOUNT": "the amount is over $500",
+    "STRUCTURING": "5 or more small transactions to the same payee within 10 minutes",
 }
 
 

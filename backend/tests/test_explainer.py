@@ -81,6 +81,20 @@ class TestExplainer(unittest.TestCase):
         for code_word in ("declined", "3x", "60 minutes", "first-time", "$500"):
             self.assertIn(code_word, sentence)
 
+    def test_structuring_explained(self):
+        _, result, sentence = _explained(
+            amount=20.0,
+            account_median_amount=50.0,
+            txns_last_60m=4,
+            same_payee_small_txns_last_10m=4,
+        )
+        self.assertEqual((result.score, result.decision), (50, "HOLD"))
+        self.assertIn(
+            "5 or more small transactions to the same payee within 10 minutes (+30)",
+            sentence,
+        )
+        self.assertIn("Held at 50/100", sentence)
+
     def test_unknown_payee_never_mentioned(self):
         _, result, sentence = _explained(
             amount=400.0,

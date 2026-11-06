@@ -8,8 +8,8 @@ a decision (HOLD or RELEASE), and the reason codes that explain it.
 Separation of responsibilities, on purpose:
   - This module MAKES the financial risk decision.
   - It does NOT talk to PayPal, read files, or call any AI.
-  - A separate explainer module (built later) will turn the
-    reason codes into a plain-English sentence. The AI explains
+  - A separate explainer module (backend/risk/explainer.py) turns
+    the reason codes into a plain-English sentence. The AI explains
     the decision; it never makes it, and it never changes the score.
 
 Pure function: same input -> same output, every time.
@@ -71,7 +71,22 @@ def classify(tx: NormalizedTransaction) -> ClassificationResult:
         score += config.POINTS["VELOCITY_BURST"]
         reason_codes.append("VELOCITY_BURST")
 
-    # --- 4. First-time payee ---
+    # --- 4. Structuring: the 5th+ small txn to the same payee in 10 min ---
+    # This is the pattern the plain velocity rule misses: five $20
+    # payments are each under every amount threshold, but together
+    # they look like splitting a larger amount to dodge the limits.
+    # Fires only when the payee is known (None never fires, same
+    # guard as NEW_PAYEE) and this transaction is itself small.
+    if (
+        tx.payee_id is not None
+        and tx.amount <= config.STRUCTURING_MAX_AMOUNT
+        and tx.same_payee_small_txns_last_10m
+        >= config.STRUCTURING_MIN_PRIOR_TXNS
+    ):
+        score += config.POINTS["STRUCTURING"]
+        reason_codes.append("STRUCTURING")
+
+    # --- 5. First-time payee ---
     # Correction carried into the build: payee_id is Optional.
     # If we don't know who the payee is, we do NOT award these
     # points, even if is_first_payee was passed in as True.
@@ -79,7 +94,7 @@ def classify(tx: NormalizedTransaction) -> ClassificationResult:
         score += config.POINTS["NEW_PAYEE"]
         reason_codes.append("NEW_PAYEE")
 
-    # --- 5. High absolute amount: over $500 ---
+    # --- 6. High absolute amount: over $500 ---
     if tx.amount > config.HIGH_AMOUNT_THRESHOLD:
         score += config.POINTS["HIGH_AMOUNT"]
         reason_codes.append("HIGH_AMOUNT")

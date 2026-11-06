@@ -16,7 +16,7 @@ const historyTable = document.getElementById("history-table");
 const historyBody = document.getElementById("history-body");
 const emptyMsg = document.getElementById("empty");
 
-// The five deterministic demo cases from docs/scoring-spec.md.
+// The six deterministic demo cases from docs/scoring-spec.md.
 // Amounts are chosen so the scores come out exact.
 const DEMO_CASES = {
   clean:     { amount: 50,  payee_id: "payee-known", sandbox_status: "SUCCESS" },
@@ -24,6 +24,25 @@ const DEMO_CASES = {
   declined:  { amount: 50,  payee_id: "payee-known", sandbox_status: "INSTRUMENT_DECLINED" },
   pattern:   { amount: 400, payee_id: "payee-new",   sandbox_status: "SUCCESS" },
   capped:    { amount: 600, payee_id: "payee-new",   sandbox_status: "INSTRUMENT_DECLINED" },
+  // Structuring: the 5th $20 to the same payee in 10 min.
+  // Seeds below are 4 x $20 to the same payee, so this one scores
+  // 20 (velocity) + 30 (structuring) = 50, HOLD.
+  structuring: { amount: 20, payee_id: "payee-structuring", sandbox_status: "SUCCESS" },
+};
+
+// History seeded before each demo case so the score is exact on
+// every click. The pattern / capped cases need account history to
+// score 60 / 100: a $100 median and 3 transactions in the last
+// 60 minutes, so they get three clean $100 transactions instead —
+// they show up in history, which is the point: the median and
+// velocity come from history.
+const DEMO_SEEDS = {
+  clean:       [{ amount: 50,  payee_id: "payee-known", count: 1 }],
+  refused:     [{ amount: 50,  payee_id: "payee-known", count: 1 }],
+  declined:    [{ amount: 50,  payee_id: "payee-known", count: 1 }],
+  pattern:     [{ amount: 100, payee_id: "payee-known", count: 3 }],
+  capped:      [{ amount: 100, payee_id: "payee-known", count: 3 }],
+  structuring: [{ amount: 20,  payee_id: "payee-structuring", count: 4 }],
 };
 
 async function score(payload) {
@@ -101,16 +120,10 @@ document.getElementById("demos").addEventListener("click", async (e) => {
   if (!btn) return;
   // Reset first so every demo case is deterministic on every click.
   await api("/api/reset", { method: "POST" });
-  // Seed one clean $50 transaction to "payee-known" first, so that
-  // payee is known (not first) for the clean / refused / declined cases.
-  // The pattern / capped cases need account history to score 60 / 100:
-  // a $100 median and 3 transactions in the last 60 minutes, so they
-  // get three clean $100 transactions instead — they show up in history,
-  // which is the point: the median and velocity come from history.
-  const seedAmount = (btn.dataset.case === "pattern" || btn.dataset.case === "capped") ? 100 : 50;
-  const seedCount = (btn.dataset.case === "pattern" || btn.dataset.case === "capped") ? 3 : 1;
-  for (let i = 0; i < seedCount; i++) {
-    await score({ amount: seedAmount, payee_id: "payee-known", sandbox_status: "SUCCESS" });
+  for (const seed of DEMO_SEEDS[btn.dataset.case] || []) {
+    for (let i = 0; i < seed.count; i++) {
+      await score({ amount: seed.amount, payee_id: seed.payee_id, sandbox_status: "SUCCESS" });
+    }
   }
   const r = await score(DEMO_CASES[btn.dataset.case]);
   if (r) { showResult(r); refreshHistory(); }
